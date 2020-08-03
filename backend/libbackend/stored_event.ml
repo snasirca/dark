@@ -365,7 +365,7 @@ let trim_events_for_handler
                   AND path LIKE $2
                   AND modifier = $3
                   AND canvas_id = $4
-                  AND timestamp < (NOW() - interval '1 week')
+                  ORDER BY timestamp DESC
                   LIMIT 10),
               to_delete AS (
                 SELECT trace_id FROM stored_events_v2
