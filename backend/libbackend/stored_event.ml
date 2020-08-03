@@ -328,6 +328,7 @@ type trim_events_canvases =
   | All
   | JustOne of string
 
+(* Keep the last 10, and anything in the last week *)
 let trim_events_for_handler
     ~(span : Libcommon.Telemetry.Span.t)
     ~(action : trim_events_action)
