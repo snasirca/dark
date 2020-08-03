@@ -67,44 +67,54 @@ let trim_results_for_handler
     ~(canvas_name : string)
     ~(tlid : string)
     (canvas_id : Uuidm.t) : int =
-  Telemetry.with_span span "trim_results_for_handler" (fun span ->
-      let db_fn trim_events_action =
-        match action with Count -> Db.fetch_count | Delete -> Db.delete
+  let action_str = Stored_event.action_to_string action in
+  Telemetry.with_span
+    span
+    "trim_results_for_handler"
+    ~attrs:
+      [ ("limit", `Int limit)
+      ; ("canvas_id", `String (canvas_id |> Uuidm.to_string))
+      ; ("canvas_name", `String canvas_name)
+      ; ("tlid", `String tlid)
+      ; ("action", `String action_str) ]
+    (fun span ->
+      let limit =
+        (* Since we're deleting traces not in the main table, if the main table
+         * has a lot of traces we might be in trouble, so cut it down a bit. *)
+        let count =
+          Db.fetch_count
+            ~name:"count stored_events_v2"
+            "SELECT COUNT(*) FROM stored_events_v2 WHERE canvas_id = $1 and tlid = $2"
+            ~params:[Db.Uuid canvas_id; Db.String tlid]
+        in
+        if count > 1000000
+        then limit / 100
+        else if count > 100000
+        then limit / 10
+        else limit
       in
-      let action_str =
-        match action with Count -> "SELECT count(*)" | Delete -> "DELETE"
-      in
-      Telemetry.Span.set_attrs
-        span
-        [ ("limit", `Int limit)
-        ; ("canvas_id", `String (canvas_id |> Uuidm.to_string))
-        ; ("canvas_name", `String canvas_name)
-        ; ("tlid", `String tlid)
-        ; ("action", `String action_str) ] ;
       let count =
         try
-          (db_fn action)
+          (Stored_event.db_fn action)
             ~name:"gc_function_results"
             (Printf.sprintf
-               "WITH last_ten AS (
-                  SELECT canvas_id, tlid, trace_id
-                  FROM function_results_v2
+               "WITH event_ids AS (
+                  SELECT trace_id
+                  FROM stored_events_v2
                   WHERE canvas_id = $1
-                    AND tlid = $2
-                    AND timestamp < (NOW() - interval '1 week') LIMIT 10),
+                    AND tlid = $2),
               to_delete AS (
-                SELECT canvas_id, tlid, trace_id
+                SELECT trace_id
                   FROM function_results_v2
                   WHERE canvas_id = $1
                     AND tlid = $2
-                    AND timestamp < (NOW() - interval '1 week')
+                    ORDER BY timestamp ASC)
                   LIMIT $3)
               %s FROM function_results_v2
                 WHERE canvas_id = $1
                   AND tlid = $2
-                  AND timestamp < (NOW() - interval '1 week')
-                  AND (canvas_id, tlid, trace_id) NOT IN (SELECT canvas_id, tlid, trace_id FROM last_ten)
-                  AND (canvas_id, tlid, trace_id) IN (SELECT canvas_id, tlid, trace_id FROM to_delete);"
+                  AND trace_id IN (SELECT trace_id FROM event_ids)
+                  AND trace_id IN (SELECT trace_id FROM to_delete);"
                action_str)
             ~params:[Db.Uuid canvas_id; Db.String tlid; Db.Int limit]
         with Exception.DarkException e ->

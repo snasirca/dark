@@ -59,6 +59,17 @@ type trim_events_canvases =
   | All
   | JustOne of string
 
+val action_to_string : trim_events_action -> string
+
+val db_fn :
+     trim_events_action
+  -> params:Db.param list
+  -> ?result:Db.result
+  -> name:string
+  -> ?subject:string
+  -> string
+  -> int
+
 val trim_events_for_canvas :
      span:Libcommon.Telemetry.Span.t
   -> action:trim_events_action
