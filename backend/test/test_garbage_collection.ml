@@ -20,17 +20,19 @@ let ten_days_ago = Time.sub (Time.now ()) (Time.Span.create ~day:10 ())
 
 let two_days_ago = Time.sub (Time.now ()) (Time.Span.of_day 2.0)
 
-let t_ten_most_recent () =
+let setup_test (path : string) : Uuidm.t =
   clear_test_data () ;
-
-  (* Setup canvas *)
   let c =
     ops2c_exn
       "test-host"
-      [Types.SetHandler (tlid, pos, http_route_handler ~route:"/path" ())]
+      [Types.SetHandler (tlid, pos, http_route_handler ~route:path ())]
   in
   Libbackend.Canvas.save_all !c ;
-  let canvas_id = !c.id in
+  !c.id
+
+
+let t_ten_most_recent () =
+  let canvas_id = setup_test "/path" in
 
   let handler = ("HTTP", "/path", "GET") in
   let store_data ~timestamp (data : int) =
@@ -88,16 +90,7 @@ let t_ten_most_recent () =
 
 
 let t_keep_last_week () =
-  clear_test_data () ;
-
-  (* Setup canvas *)
-  let c =
-    ops2c_exn
-      "test-host"
-      [Types.SetHandler (tlid, pos, http_route_handler ~route:"/path" ())]
-  in
-  Libbackend.Canvas.save_all !c ;
-  let canvas_id = !c.id in
+  let canvas_id = setup_test "/path" in
 
   let handler = ("HTTP", "/path", "GET") in
   let store_data ~timestamp (data : int) =
@@ -173,16 +166,7 @@ let t_keep_last_week () =
 
 (* old garbage which matches no handler is completely gone. *)
 let t_unmatched_garbage () =
-  clear_test_data () ;
-
-  (* Setup canvas *)
-  let c =
-    ops2c_exn
-      "test-host"
-      [Types.SetHandler (tlid, pos, http_route_handler ~route:"/path" ())]
-  in
-  Libbackend.Canvas.save_all !c ;
-  let canvas_id = !c.id in
+  let canvas_id = setup_test "/path" in
 
   let store_data handler =
     let trace_id = Util.create_uuid () in
@@ -231,18 +215,8 @@ let t_unmatched_garbage () =
 
 
 let t_wildcard_cleanup () =
-  (* old garbage which matches no handler is completely gone. *)
-  clear_test_data () ;
-
-  (* Setup canvas *)
   let path = "/:part1/other/:part2" in
-  let c =
-    ops2c_exn
-      "test-host"
-      [Types.SetHandler (tlid, pos, http_route_handler ~route:path ())]
-  in
-  Libbackend.Canvas.save_all !c ;
-  let canvas_id = !c.id in
+  let canvas_id = setup_test path in
 
   let store_data segment1 segment2 =
     let trace_id = Util.create_uuid () in
