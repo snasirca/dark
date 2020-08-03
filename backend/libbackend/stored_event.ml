@@ -339,16 +339,18 @@ let trim_events_for_handler
     ~(canvas_name : string)
     ~(canvas_id : Uuidm.t) : int =
   let action_str = action_to_string action in
-  Telemetry.with_span span "trim_events_for_handler" (fun span ->
-      Telemetry.Span.set_attrs
-        span
-        [ ("limit", `Int limit)
-        ; ("module", `String module_)
-        ; ("path", `String path)
-        ; ("modifier", `String modifier)
-        ; ("canvas_name", `String canvas_name)
-        ; ("canvas_id", `String (canvas_id |> Uuidm.to_string))
-        ; ("action", `String action_str) ] ;
+  Telemetry.with_span
+    span
+    "trim_events_for_handler"
+    ~attrs:
+      [ ("limit", `Int limit)
+      ; ("module", `String module_)
+      ; ("path", `String path)
+      ; ("modifier", `String modifier)
+      ; ("canvas_name", `String canvas_name)
+      ; ("canvas_id", `String (canvas_id |> Uuidm.to_string))
+      ; ("action", `String action_str) ]
+    (fun span ->
       let count =
         try
           (db_fn action)
