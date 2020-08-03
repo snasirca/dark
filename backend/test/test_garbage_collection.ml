@@ -18,6 +18,159 @@ let span : Telemetry.Span.t =
 
 let ten_days_ago = Time.sub (Time.now ()) (Time.Span.create ~day:10 ())
 
+let two_days_ago = Time.sub (Time.now ()) (Time.Span.of_day 2.0)
+
+let t_ten_most_recent () =
+  clear_test_data () ;
+
+  (* Setup canvas *)
+  let c =
+    ops2c_exn
+      "test-host"
+      [Types.SetHandler (tlid, pos, http_route_handler ~route:"/path" ())]
+  in
+  Libbackend.Canvas.save_all !c ;
+  let canvas_id = !c.id in
+
+  let handler = ("HTTP", "/path", "GET") in
+  let store_data ~timestamp (data : int) =
+    let timestamp = Time.add timestamp (Time.Span.of_min (Int.to_float data)) in
+    let trace_id = Util.create_uuid () in
+    ignore
+      (SE.store_event
+         ~canvas_id
+         ~trace_id
+         ~timestamp
+         handler
+         (Dval.dstr_of_string_exn (Int.to_string data))) ;
+    ()
+  in
+  store_data 1 ~timestamp:two_days_ago ;
+  store_data 2 ~timestamp:two_days_ago ;
+  store_data 3 ~timestamp:two_days_ago ;
+  store_data 4 ~timestamp:ten_days_ago ;
+  store_data 5 ~timestamp:ten_days_ago ;
+  store_data 6 ~timestamp:ten_days_ago ;
+  store_data 7 ~timestamp:ten_days_ago ;
+  store_data 8 ~timestamp:ten_days_ago ;
+  store_data 9 ~timestamp:ten_days_ago ;
+  store_data 10 ~timestamp:ten_days_ago ;
+  store_data 11 ~timestamp:ten_days_ago ;
+  store_data 12 ~timestamp:ten_days_ago ;
+  store_data 13 ~timestamp:ten_days_ago ;
+  store_data 14 ~timestamp:ten_days_ago ;
+  store_data 15 ~timestamp:ten_days_ago ;
+  store_data 16 ~timestamp:ten_days_ago ;
+  store_data 17 ~timestamp:ten_days_ago ;
+  store_data 18 ~timestamp:ten_days_ago ;
+  (* We expect that we keep 10 traces: 3 recent and 7 older *)
+  let expected =
+    Stored_event.trim_events_for_canvas
+      ~span
+      ~action:Count
+      canvas_id
+      "test-host"
+      10000
+  in
+  AT.check AT.int "expected is right" 8 expected ;
+  let deleted =
+    Stored_event.trim_events_for_canvas
+      ~span
+      ~action:Delete
+      canvas_id
+      "test-host"
+      10000
+  in
+  AT.check AT.int "deleted row count is right" 8 deleted ;
+  let events = SE.load_events ~limit:20 ~canvas_id handler in
+  AT.check AT.int "Only 10 remain" 10 (List.length events) ;
+  ()
+
+
+let t_keep_last_week () =
+  clear_test_data () ;
+
+  (* Setup canvas *)
+  let c =
+    ops2c_exn
+      "test-host"
+      [Types.SetHandler (tlid, pos, http_route_handler ~route:"/path" ())]
+  in
+  Libbackend.Canvas.save_all !c ;
+  let canvas_id = !c.id in
+
+  let handler = ("HTTP", "/path", "GET") in
+  let store_data ~timestamp (data : int) =
+    let timestamp = Time.add timestamp (Time.Span.of_min (Int.to_float data)) in
+    let trace_id = Util.create_uuid () in
+    ignore
+      (SE.store_event
+         ~canvas_id
+         ~trace_id
+         ~timestamp
+         handler
+         (Dval.dstr_of_string_exn (Int.to_string data))) ;
+    ()
+  in
+  store_data 1 ~timestamp:two_days_ago ;
+  store_data 2 ~timestamp:two_days_ago ;
+  store_data 3 ~timestamp:two_days_ago ;
+  store_data 4 ~timestamp:two_days_ago ;
+  store_data 5 ~timestamp:two_days_ago ;
+  store_data 6 ~timestamp:two_days_ago ;
+  store_data 7 ~timestamp:two_days_ago ;
+  store_data 8 ~timestamp:two_days_ago ;
+  store_data 9 ~timestamp:two_days_ago ;
+  store_data 10 ~timestamp:two_days_ago ;
+  store_data 11 ~timestamp:two_days_ago ;
+  store_data 12 ~timestamp:two_days_ago ;
+  store_data 13 ~timestamp:two_days_ago ;
+  store_data 14 ~timestamp:two_days_ago ;
+  store_data 15 ~timestamp:two_days_ago ;
+  store_data 16 ~timestamp:two_days_ago ;
+  store_data 17 ~timestamp:two_days_ago ;
+  store_data 18 ~timestamp:two_days_ago ;
+  store_data 19 ~timestamp:two_days_ago ;
+  store_data 20 ~timestamp:two_days_ago ;
+  store_data 21 ~timestamp:two_days_ago ;
+  store_data 22 ~timestamp:ten_days_ago ;
+  store_data 23 ~timestamp:ten_days_ago ;
+  store_data 24 ~timestamp:ten_days_ago ;
+  store_data 25 ~timestamp:ten_days_ago ;
+  store_data 26 ~timestamp:ten_days_ago ;
+  store_data 27 ~timestamp:ten_days_ago ;
+  store_data 28 ~timestamp:ten_days_ago ;
+  store_data 29 ~timestamp:ten_days_ago ;
+  store_data 30 ~timestamp:ten_days_ago ;
+  store_data 31 ~timestamp:ten_days_ago ;
+  store_data 32 ~timestamp:ten_days_ago ;
+  store_data 33 ~timestamp:ten_days_ago ;
+  store_data 34 ~timestamp:ten_days_ago ;
+  store_data 35 ~timestamp:ten_days_ago ;
+  (* We expect that we keep 21 traces: all those younger than a week *)
+  let expected =
+    Stored_event.trim_events_for_canvas
+      ~span
+      ~action:Count
+      canvas_id
+      "test-host"
+      10000
+  in
+  AT.check AT.int "expected is right" 14 expected ;
+  let deleted =
+    Stored_event.trim_events_for_canvas
+      ~span
+      ~action:Delete
+      canvas_id
+      "test-host"
+      10000
+  in
+  AT.check AT.int "deleted row count is right" 14 deleted ;
+  let events = SE.load_events ~limit:50 ~canvas_id handler in
+  AT.check AT.int "Only young remain" 21 (List.length events) ;
+  ()
+
+
 (* old garbage which matches no handler is completely gone. *)
 let t_unmatched_garbage () =
   clear_test_data () ;
@@ -146,4 +299,6 @@ let t_wildcard_cleanup () =
 
 let suite =
   [ ("unmatched_garbage", `Quick, t_unmatched_garbage)
+  ; ("ten most recent are saved", `Quick, t_ten_most_recent)
+  ; ("keep all last week, regardless", `Quick, t_keep_last_week)
   ; ("wildcards are treated properly", `Quick, t_wildcard_cleanup) ]
