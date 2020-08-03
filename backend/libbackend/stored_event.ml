@@ -1,10 +1,10 @@
 (** Stored events. These are the "input values" for handler traces, containing
   * the `request` or `event` for a trace.
-  * 
+  *
   * We keep traces around for a week, and also keep the last 10 regardless of age.
   *
   * Traces are also used for 404s - which are just traces for which a handler doesn't exist.
-  * Note that traces are stored for routes (technically for an `event_desc`), not for handlers. 
+  * Note that traces are stored for routes (technically for an `event_desc`), not for handlers.
   * There is a GC process to clean these up.
   *)
 
