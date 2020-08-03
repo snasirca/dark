@@ -29,7 +29,8 @@ val load_event_for_trace :
   -> (string * Types.RuntimeT.time * Types.RuntimeT.dval) option
 
 val load_events :
-     canvas_id:Uuidm.t
+     ?limit:int
+  -> canvas_id:Uuidm.t
   -> event_desc
   -> (string * Uuidm.t * Types.RuntimeT.time * Types.RuntimeT.dval) list
 

@@ -155,8 +155,11 @@ let list_event_descs
              Exception.internal "Bad DB format for stored_events")
 
 
-let load_events ~(canvas_id : Uuidm.t) ((module_, route, modifier) : event_desc)
-    : (string * Uuidm.t * RTT.time * RTT.dval) list =
+let load_events
+    ?(limit = 10)
+    ~(canvas_id : Uuidm.t)
+    ((module_, route, modifier) : event_desc) :
+    (string * Uuidm.t * RTT.time * RTT.dval) list =
   let route = Http.route_to_postgres_pattern route in
   Db.fetch
     ~name:"load_events"
@@ -167,9 +170,10 @@ let load_events ~(canvas_id : Uuidm.t) ((module_, route, modifier) : event_desc)
       AND path LIKE $3
       AND modifier = $4
     ORDER BY timestamp DESC
-    LIMIT 10"
+    LIMIT $5"
     (* the number in the LIMIT is shared with Analysis.mergeTraces on the client *)
-    ~params:[Uuid canvas_id; String module_; String route; String modifier]
+    ~params:
+      [Uuid canvas_id; String module_; String route; String modifier; Int limit]
   |> List.map ~f:(function
          | [request_path; dval; ts; trace_id] ->
              let trace_id = Util.uuid_of_string trace_id in
