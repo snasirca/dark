@@ -20,6 +20,8 @@ let ten_days_ago = Time.sub (Time.now ()) (Time.Span.create ~day:10 ())
 
 let two_days_ago = Time.sub (Time.now ()) (Time.Span.of_day 2.0)
 
+let check_int = AT.check AT.int
+
 let setup_test (path : string) : Uuidm.t =
   clear_test_data () ;
   let c =
@@ -31,59 +33,64 @@ let setup_test (path : string) : Uuidm.t =
   !c.id
 
 
+let store_data ~timestamp ~canvas_id handler (data : int) =
+  let timestamp = Time.add timestamp (Time.Span.of_min (Int.to_float data)) in
+  let trace_id = Util.create_uuid () in
+  ignore
+    (SE.store_event
+       ~canvas_id
+       ~trace_id
+       ~timestamp
+       handler
+       (Dval.dstr_of_string_exn (Int.to_string data))) ;
+  ()
+
+
+let count_events_to_be_deleted canvas_id =
+  Stored_event.trim_events_for_canvas
+    ~span
+    ~action:Count
+    canvas_id
+    "test-host"
+    10000
+
+
+let delete_events canvas_id =
+  Stored_event.trim_events_for_canvas
+    ~span
+    ~action:Delete
+    canvas_id
+    "test-host"
+    10000
+
+
 let t_ten_most_recent () =
   let canvas_id = setup_test "/path" in
 
   let handler = ("HTTP", "/path", "GET") in
-  let store_data ~timestamp (data : int) =
-    let timestamp = Time.add timestamp (Time.Span.of_min (Int.to_float data)) in
-    let trace_id = Util.create_uuid () in
-    ignore
-      (SE.store_event
-         ~canvas_id
-         ~trace_id
-         ~timestamp
-         handler
-         (Dval.dstr_of_string_exn (Int.to_string data))) ;
-    ()
-  in
-  store_data 1 ~timestamp:two_days_ago ;
-  store_data 2 ~timestamp:two_days_ago ;
-  store_data 3 ~timestamp:two_days_ago ;
-  store_data 4 ~timestamp:ten_days_ago ;
-  store_data 5 ~timestamp:ten_days_ago ;
-  store_data 6 ~timestamp:ten_days_ago ;
-  store_data 7 ~timestamp:ten_days_ago ;
-  store_data 8 ~timestamp:ten_days_ago ;
-  store_data 9 ~timestamp:ten_days_ago ;
-  store_data 10 ~timestamp:ten_days_ago ;
-  store_data 11 ~timestamp:ten_days_ago ;
-  store_data 12 ~timestamp:ten_days_ago ;
-  store_data 13 ~timestamp:ten_days_ago ;
-  store_data 14 ~timestamp:ten_days_ago ;
-  store_data 15 ~timestamp:ten_days_ago ;
-  store_data 16 ~timestamp:ten_days_ago ;
-  store_data 17 ~timestamp:ten_days_ago ;
-  store_data 18 ~timestamp:ten_days_ago ;
+  let store_data = store_data ~canvas_id handler in
+
+  store_data ~timestamp:two_days_ago 1 ;
+  store_data ~timestamp:two_days_ago 2 ;
+  store_data ~timestamp:two_days_ago 3 ;
+  store_data ~timestamp:ten_days_ago 4 ;
+  store_data ~timestamp:ten_days_ago 5 ;
+  store_data ~timestamp:ten_days_ago 6 ;
+  store_data ~timestamp:ten_days_ago 7 ;
+  store_data ~timestamp:ten_days_ago 8 ;
+  store_data ~timestamp:ten_days_ago 9 ;
+  store_data ~timestamp:ten_days_ago 10 ;
+  store_data ~timestamp:ten_days_ago 11 ;
+  store_data ~timestamp:ten_days_ago 12 ;
+  store_data ~timestamp:ten_days_ago 13 ;
+  store_data ~timestamp:ten_days_ago 14 ;
+  store_data ~timestamp:ten_days_ago 15 ;
+  store_data ~timestamp:ten_days_ago 16 ;
+  store_data ~timestamp:ten_days_ago 17 ;
+  store_data ~timestamp:ten_days_ago 18 ;
   (* We expect that we keep 10 traces: 3 recent and 7 older *)
-  let expected =
-    Stored_event.trim_events_for_canvas
-      ~span
-      ~action:Count
-      canvas_id
-      "test-host"
-      10000
-  in
-  AT.check AT.int "expected is right" 8 expected ;
-  let deleted =
-    Stored_event.trim_events_for_canvas
-      ~span
-      ~action:Delete
-      canvas_id
-      "test-host"
-      10000
-  in
-  AT.check AT.int "deleted row count is right" 8 deleted ;
+  check_int "expected is right" 8 (count_events_to_be_deleted canvas_id) ;
+  check_int "deleted is right" 8 (delete_events canvas_id) ;
   let events = SE.load_events ~limit:20 ~canvas_id handler in
   AT.check AT.int "Only 10 remain" 10 (List.length events) ;
   ()
@@ -93,18 +100,7 @@ let t_keep_last_week () =
   let canvas_id = setup_test "/path" in
 
   let handler = ("HTTP", "/path", "GET") in
-  let store_data ~timestamp (data : int) =
-    let timestamp = Time.add timestamp (Time.Span.of_min (Int.to_float data)) in
-    let trace_id = Util.create_uuid () in
-    ignore
-      (SE.store_event
-         ~canvas_id
-         ~trace_id
-         ~timestamp
-         handler
-         (Dval.dstr_of_string_exn (Int.to_string data))) ;
-    ()
-  in
+  let store_data = store_data ~canvas_id handler in
   store_data 1 ~timestamp:two_days_ago ;
   store_data 2 ~timestamp:two_days_ago ;
   store_data 3 ~timestamp:two_days_ago ;
@@ -140,27 +136,12 @@ let t_keep_last_week () =
   store_data 33 ~timestamp:ten_days_ago ;
   store_data 34 ~timestamp:ten_days_ago ;
   store_data 35 ~timestamp:ten_days_ago ;
+
   (* We expect that we keep 21 traces: all those younger than a week *)
-  let expected =
-    Stored_event.trim_events_for_canvas
-      ~span
-      ~action:Count
-      canvas_id
-      "test-host"
-      10000
-  in
-  AT.check AT.int "expected is right" 14 expected ;
-  let deleted =
-    Stored_event.trim_events_for_canvas
-      ~span
-      ~action:Delete
-      canvas_id
-      "test-host"
-      10000
-  in
-  AT.check AT.int "deleted row count is right" 14 deleted ;
+  check_int "expected is right" 14 (count_events_to_be_deleted canvas_id) ;
+  check_int "deleted is right" 14 (delete_events canvas_id) ;
   let events = SE.load_events ~limit:50 ~canvas_id handler in
-  AT.check AT.int "Only young remain" 21 (List.length events) ;
+  check_int "Only young remain" 21 (List.length events) ;
   ()
 
 
@@ -168,45 +149,20 @@ let t_keep_last_week () =
 let t_unmatched_garbage () =
   let canvas_id = setup_test "/path" in
 
-  let store_data handler =
-    let trace_id = Util.create_uuid () in
-    ignore
-      (SE.store_event
-         ~canvas_id
-         ~trace_id
-         ~timestamp:ten_days_ago
-         handler
-         (Dval.dstr_of_string_exn "1")) ;
-    ()
-  in
+  let store_data = store_data ~timestamp:ten_days_ago ~canvas_id in
   let good_handler = ("HTTP", "/path", "GET") in
   let f404_handler = ("HTTP", "/path", "POST") in
-  store_data good_handler ;
-  store_data good_handler ;
-  store_data good_handler ;
-  store_data f404_handler ;
-  store_data f404_handler ;
-  store_data f404_handler ;
+  store_data good_handler 1 ;
+  store_data good_handler 2 ;
+  store_data good_handler 3 ;
+  store_data f404_handler 4 ;
+  store_data f404_handler 5 ;
+  store_data f404_handler 6 ;
+
   (* We expect that we keep 4 traces (good + latest 404) and delete 2
    * (non-latest 404s)) *)
-  let expected =
-    Stored_event.trim_events_for_canvas
-      ~span
-      ~action:Count
-      canvas_id
-      "test-host"
-      10000
-  in
-  AT.check AT.int "expected is right" 2 expected ;
-  let deleted =
-    Stored_event.trim_events_for_canvas
-      ~span
-      ~action:Delete
-      canvas_id
-      "test-host"
-      10000
-  in
-  AT.check AT.int "deleted row count is right" 2 deleted ;
+  check_int "expected is right" 2 (count_events_to_be_deleted canvas_id) ;
+  check_int "deleted is right" 2 (delete_events canvas_id) ;
   let f404 = SE.load_events ~canvas_id f404_handler in
   AT.check AT.int "1 404 remains" 1 (List.length f404) ;
   let good = SE.load_events ~canvas_id good_handler in
@@ -219,15 +175,11 @@ let t_wildcard_cleanup () =
   let canvas_id = setup_test path in
 
   let store_data segment1 segment2 =
-    let trace_id = Util.create_uuid () in
-    ignore
-      (SE.store_event
-         ~canvas_id
-         ~trace_id
-         ~timestamp:ten_days_ago
-         ("HTTP", "/" ^ segment1 ^ "/other/" ^ segment2, "GET")
-         (Dval.dstr_of_string_exn "1")) ;
-    ()
+    store_data
+      ~timestamp:ten_days_ago
+      ~canvas_id
+      ("HTTP", "/" ^ segment1 ^ "/other/" ^ segment2, "GET")
+      1
   in
   store_data "a1" "b1" ;
   store_data "a2" "b2" ;
@@ -247,27 +199,12 @@ let t_wildcard_cleanup () =
   store_data "a16" "b16" ;
   store_data "a17" "b17" ;
   store_data "a18" "b18" ;
+
   (* We expect that we keep 10 traces (good + latest 404) and delete 8 *)
-  let expected =
-    Stored_event.trim_events_for_canvas
-      ~span
-      ~action:Count
-      canvas_id
-      "test-host"
-      10000
-  in
-  AT.check AT.int "expected is right" 8 expected ;
-  let deleted =
-    Stored_event.trim_events_for_canvas
-      ~span
-      ~action:Delete
-      canvas_id
-      "test-host"
-      10000
-  in
-  AT.check AT.int "deleted row count is right" 8 deleted ;
+  check_int "expected is right" 8 (count_events_to_be_deleted canvas_id) ;
+  check_int "deleted is right" 8 (delete_events canvas_id) ;
   let good = SE.load_events ~canvas_id ("HTTP", path, "GET") in
-  AT.check AT.int "all good events remain" 10 (List.length good) ;
+  check_int "all good events remain" 10 (List.length good) ;
   ()
 
 
