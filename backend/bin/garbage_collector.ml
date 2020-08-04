@@ -27,7 +27,12 @@ let () =
         match canvas_arg with "all" -> All | name -> JustOne name
       in
       let limit = limit |> int_of_string in
-
-      Libbackend.Garbage_collection.collect action limit canvas
+      ( try Libbackend.Garbage_collection.collect action limit canvas
+        with e ->
+          let bt = Libexecution.Exception.get_backtrace () in
+          print_endline "Uncaught exception\n\n" ;
+          print_endline (Libexecution.Exception.to_string e) ;
+          print_endline (Libexecution.Exception.backtrace_to_string bt) ;
+          Libexecution.Exception.reraise e )
   | _ ->
       usage ()
