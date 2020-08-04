@@ -87,22 +87,6 @@ let trim_arguments_for_handler
       ; ("tlid", `String tlid)
       ; ("action", `String action_str) ]
     (fun span ->
-      let limit =
-        (* Since we're deleting traces not in the main table, if the main table
-         * has a lot of traces we might be in trouble, so cut it down a bit. *)
-        let count =
-          Db.fetch_count
-            ~name:"count stored_events_v2"
-            "SELECT COUNT(*) FROM stored_events_v2 WHERE canvas_id = $1 and tlid = $2"
-            ~params:[Db.Uuid canvas_id; Db.String tlid]
-        in
-        if count > 1000000
-        then limit / 100
-        else if count > 100000
-        then limit / 10
-        else limit
-      in
-
       let count =
         try
           (Stored_event.db_fn action)
@@ -111,8 +95,7 @@ let trim_arguments_for_handler
                "WITH event_ids AS (
                   SELECT trace_id
                   FROM stored_events_v2
-                  WHERE canvas_id = $1
-                    AND tlid = $2),
+                  WHERE canvas_id = $1),
               to_delete AS (
                 SELECT trace_id
                   FROM function_arguments
